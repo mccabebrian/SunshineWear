@@ -20,6 +20,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.support.annotation.NonNull;
+import android.util.Log;
 
 import com.example.android.sunshine.data.WeatherContract;
 import com.firebase.jobdispatcher.Constraint;
@@ -29,8 +30,18 @@ import com.firebase.jobdispatcher.GooglePlayDriver;
 import com.firebase.jobdispatcher.Job;
 import com.firebase.jobdispatcher.Lifetime;
 import com.firebase.jobdispatcher.Trigger;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
+import com.google.android.gms.wearable.Wearable;
 
 import java.util.concurrent.TimeUnit;
+
+import static android.content.ContentValues.TAG;
+import static com.example.android.sunshine.data.WeatherContract.WeatherEntry.COLUMN_MAX_TEMP;
+import static com.example.android.sunshine.utilities.NotificationUtils.INDEX_MAX_TEMP;
 
 public class SunshineSyncUtils {
 
@@ -106,7 +117,7 @@ public class SunshineSyncUtils {
      * @param context Context that will be passed to other methods and used to access the
      *                ContentResolver
      */
-    synchronized public static void initialize(@NonNull final Context context) {
+    synchronized public static void initialize(@NonNull final Context context, final GoogleApiClient mGoogleApiClient) {
 
         /*
          * Only perform initialization once per app lifetime. If initialization has already been
@@ -141,7 +152,9 @@ public class SunshineSyncUtils {
                  * row. In our queries where we display data, we need to PROJECT more columns
                  * to determine what weather details need to be displayed.
                  */
-                String[] projectionColumns = {WeatherContract.WeatherEntry._ID};
+                String[] projectionColumns = {WeatherContract.WeatherEntry._ID,
+                        WeatherContract.WeatherEntry.COLUMN_MAX_TEMP,
+                        WeatherContract.WeatherEntry.COLUMN_MIN_TEMP, WeatherContract.WeatherEntry.COLUMN_WEATHER_ID};
                 String selectionStatement = WeatherContract.WeatherEntry
                         .getSqlSelectForTodayOnwards();
 
@@ -168,9 +181,38 @@ public class SunshineSyncUtils {
                  */
                 if (null == cursor || cursor.getCount() == 0) {
                     startImmediateSync(context);
-                }
+                }else {
 
                 /* Make sure to close the Cursor to avoid memory leaks! */
+                    cursor.moveToFirst();
+                    String maxTemp = cursor.getString(1);
+                    String minTemp = cursor.getString(2);
+                    String iconId = cursor.getString(3);
+
+                    int maxTempRounded = (int) Math.round(Double.parseDouble(maxTemp));
+                    int minTempRounded = (int) Math.round(Double.parseDouble(minTemp));
+
+                    PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/wear");
+                    putDataMapRequest.setUrgent();
+                    putDataMapRequest.getDataMap().putInt("maxTemp", maxTempRounded);
+                    putDataMapRequest.getDataMap().putInt("minTemp", minTempRounded);
+                    putDataMapRequest.getDataMap().putString("iconId", iconId);
+
+                    Log.e("icon", iconId);
+                    PutDataRequest request = putDataMapRequest.asPutDataRequest();
+                    Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                            .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                                                   @Override
+                                                   public void onResult(DataApi.DataItemResult dataItemResult) {
+                                                       if (dataItemResult.getStatus().isSuccess()) {
+                                                           Log.d(TAG, "Successfully sent");
+                                                       } else {
+                                                           Log.d(TAG, "Failed to send");
+                                                       }
+                                                   }
+                                               }
+                            );
+                }
                 cursor.close();
             }
         });
