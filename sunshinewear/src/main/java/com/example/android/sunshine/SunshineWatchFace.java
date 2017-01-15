@@ -22,17 +22,17 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.util.Log;
@@ -63,11 +63,8 @@ import static android.content.ContentValues.TAG;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class SunshineWatchFace extends CanvasWatchFaceService {
-
-    GoogleApiClient mGoogleApiClient;
-    String highTempText = "N/A";
-    String lowTempText = "N/A";
-    Bitmap weatherIcon;
+    String highTempText = " ";
+    String lowTempText = " ";
     int icon_id;
     private static final Typeface NORMAL_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
@@ -354,6 +351,21 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             invalidate();
         }
 
+        public Bitmap getBitmapFromVectorDrawable(int drawableId) {
+            Drawable drawable = getResources().getDrawable(drawableId);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                drawable = (DrawableCompat.wrap(drawable)).mutate();
+            }
+
+            Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
+                    drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            drawable.draw(canvas);
+
+            return bitmap;
+        }
+
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
             // Draw the background.
@@ -370,7 +382,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             final String dayOfWeek = mCalendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault());
             final String month = mCalendar.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.getDefault());
             final int dayOfMonth = mCalendar.get(Calendar.DAY_OF_MONTH);
-            float mWeatherIconXCenter = 0;
 
             String text = mAmbient
                     ? String.format("%d:%02d", mCalendar.get(Calendar.HOUR),
@@ -379,20 +390,15 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     mCalendar.get(Calendar.MINUTE));
 
             int mWeatherIcon = getLargeArtResourceIdForWeatherCondition(icon_id);
-            if ( mWeatherIcon != -1 ) {
-                weatherIcon = BitmapFactory.decodeResource(getResources(), mWeatherIcon);
-                if(weatherIcon!=null)
-                mWeatherIconXCenter = bounds.centerX() - weatherIcon.getWidth() / 2;
-            }
+            Bitmap bm = getBitmapFromVectorDrawable(mWeatherIcon);
 
             canvas.drawText(dayOfWeek + ",", mXOffset+90, mYOffset-80, mTextPaint);
             canvas.drawText(month + " " + dayOfMonth, mXOffset+80, mYOffset-20, mTextPaint);
             canvas.drawText(text, mXOffset+80, mYOffset+40, mTextPaint);
-            canvas.drawText(highTempText + "\u00B0", mXOffset+70, mYOffset+90, mTextPaint);
-            canvas.drawText(lowTempText + "\u00B0", mXOffset+150, mYOffset+90, mTextPaint);
-            if ( mWeatherIcon != -1 && mWeatherIconXCenter != 0) {
-                canvas.drawBitmap(weatherIcon, mXOffset +40, mYOffset+90, mTextPaint);
-            }
+            canvas.drawText(highTempText, mXOffset+100, mYOffset+90, mTextPaint);
+            canvas.drawText(lowTempText, mXOffset+150, mYOffset+90, mTextPaint);
+            if(bm!=null)
+            canvas.drawBitmap(bm, mXOffset +40, mYOffset+60, mTextPaint);
         }
 
         /**
