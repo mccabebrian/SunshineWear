@@ -194,8 +194,8 @@ public class SunshineSyncUtils {
 
                     PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/wear");
                     putDataMapRequest.setUrgent();
-                    putDataMapRequest.getDataMap().putInt("maxTemp", maxTempRounded);
-                    putDataMapRequest.getDataMap().putInt("minTemp", minTempRounded);
+                    putDataMapRequest.getDataMap().putInt("maxTemp", maxTempRounded + 21);
+                    putDataMapRequest.getDataMap().putInt("minTemp", minTempRounded + 14);
                     putDataMapRequest.getDataMap().putString("iconId", iconId);
 
                     Log.e("icon", iconId);
